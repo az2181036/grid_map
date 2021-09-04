@@ -3,10 +3,10 @@ import numpy as np
 
 
 def get_coordinate(t, mod1, mod2):
-    x = t % mod1
-    y = (t - x * mod1) % mod2
+    x = math.floor(t / mod1)
+    y = math.floor((t - x * mod1) / mod2)
     z = (t - x * mod1 - y * mod2)
-    return x,y,z
+    return x, y, z
 
 def get_ABC(x, y):
     a = y[1] - y[0]
