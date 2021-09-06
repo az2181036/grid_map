@@ -39,7 +39,7 @@ fragment_shader = """
 out vec4 outColor;
 void main()
 {
-    outColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+    outColor = vec4(0.0, 1.0, 0.0, 1.0);
 }
 """
 
@@ -49,7 +49,6 @@ vertices = np.array([
         0.5, 0.5, 0.5,
         0.5, -0.5, 0.5,
         -0.5, -0.5, 0.5,  # v0-v1-v2-v3
-
         -0.5, 0.5, -0.5,
         0.5, 0.5, -0.5,
         0.5, -0.5, -0.5,
@@ -66,7 +65,7 @@ indices = np.array([
     ], dtype=np.int)
 
 cubes = []
-cube_indices = indices.copy()
+cube_indices = []
 cnt = 0
 
 for val in voxel:
@@ -74,18 +73,51 @@ for val in voxel:
     tmp_vertices[0::3] += val[0]
     tmp_vertices[1::3] += val[1]
     tmp_vertices[2::3] += val[2]
-    cubes.extend(tmp_vertices)
+    cubes.extend(tmp_vertices.tolist())
 
     tmp_indices = indices.copy()
-    tmp_indices += indices + 8 * cnt
-    np.vstack((cube_indices, tmp_indices))
+    tmp_indices += 8 * cnt
+    cube_indices.extend(tmp_indices.tolist())
     cnt += 1
 
 cubes = np.array(cubes, dtype=np.float32)
+cube_indices = np.array(cube_indices, dtype=np.int)
 
-cameraPos = glm.vec3(-1, 2, 240)
+# cubes = np.array([
+#     -0.5, 3.5, 250.5,
+#     0.5, 3.5, 250.5,
+#     0.5, 2.5, 250.5,
+#     -0.5, 2.5, 250.5,
+#
+#     -0.5, 3.5, 249.5,
+#     0.5, 3.5, 249.5,
+#     0.5, 2.5, 249.5,
+#     -0.5, 2.5, 249.5,
+#
+#     -0.5, 93.5, 249.5,
+#     0.5, 93.5, 249.5,
+#     0.5, 92.5, 249.5,
+#     -0.5, 92.5, 249.5,
+#
+#     -0.5, 93.5, 248.5,
+#     0.5, 93.5, 248.5,
+#     0.5, 92.5, 248.5,
+#     -0.5, 92.5, 248.5
+# ], dtype=np.float32)
+# cubes_indices = np.array([
+#         0, 1, 2, 3,  # v0-v1-v2-v3 (front)
+#         4, 5, 1, 0,  # v4-v5-v1-v0 (top)
+#         3, 2, 6, 7,  # v3-v2-v6-v7 (bottom)
+#         5, 4, 7, 6,  # v5-v4-v7-v6 (back)
+#         1, 5, 6, 2,  # v1-v5-v6-v2 (right)
+#         4, 0, 3, 7,  # v4-v0-v3-v7 (left)
+# ], dtype=np.int)
+# cube_indices = np.hstack((cubes_indices, cubes_indices+8))
+
+
+cameraPos = glm.vec3(256, 0, 512)
 cameraFront = glm.vec3(0, 0, -1)
-cameraUp = glm.vec3(0, 1, 0)
+cameraUp = glm.vec3(0, -1, 0)
 deltaTime = 0
 lastTime = 0
 fov = 45.0
@@ -120,20 +152,18 @@ def main():
 
     ebo = glGenBuffers(1)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, cube_indices.itemsize * len(cube_indices), indices, GL_STATIC_DRAW)
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, cube_indices.itemsize * len(cube_indices), cube_indices, GL_STATIC_DRAW)
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
 
     glUseProgram(shader)
     glEnable(GL_DEPTH_TEST)
-    glEnable(GL_POLYGON_OFFSET_LINE)
-    glPolygonOffset(-1.0, -1.0)
-
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+    # glPolygonOffset(-1.0, -1.0)
 
     model = glm.mat4(1.0)
     projection = glm.perspective(glm.radians(fov), float(scr_width) / float(scr_height), 0.1, 512)
-    # projection = glm.ortho(0.0, 512.0, 0, 512, 0, 512)
 
     view_loc = glGetUniformLocation(shader, "view")
     proj_loc = glGetUniformLocation(shader, "projection")
@@ -142,23 +172,27 @@ def main():
     glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm.value_ptr(model))
     glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm.value_ptr(projection))
 
+
     while not glfw.window_should_close(window):
         currentTime = glfw.get_time()
         deltaTime = currentTime - lastTime
         lastTime = currentTime
 
-        glClearColor(0.2, 0.3, 0.3, 1.0)
+        glClearColor(1.0, 1.0, 1.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glViewport(0, 0, scr_width, scr_height)
 
         processInput(window)
 
         print(cameraPos)
         view = glm.lookAt(cameraPos,
-                          glm.vec3(0, 3, 250),
+                          glm.vec3(256, 256, 0),
                           cameraUp)
         glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm.value_ptr(view))
 
         glDrawElements(GL_QUADS, len(cube_indices), GL_UNSIGNED_INT, None)
+        # glDrawElements(GL_LINE_LOOP, len(cube_indices), GL_UNSIGNED_INT, None)
+        # glDrawElements(GL_LINES, len(cube_indices), GL_UNSIGNED_INT, None)
         glfw.swap_buffers(window)
         glfw.poll_events()
     glfw.terminate()

@@ -1,7 +1,7 @@
 import numpy
 import numpy as np
 import struct
-import util
+from utils import util
 
 
 class Voxels(object):
