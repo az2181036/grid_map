@@ -50,4 +50,4 @@ def get_vertices_info(filepath):
     cubes = np.array(cubes, dtype=np.float32)
     cube_indices = np.array(cube_indices, dtype=np.int)
 
-    return cubes, cube_indices
+    return cubes, cube_indices, textures_info

@@ -18,13 +18,57 @@ import math
 from utils import vertex_info, util
 
 model_path = './map/NewWorld1.obj_512.binvox'
-cubes, cube_indices = vertex_info.get_vertices_info(model_path)
+cubes, cube_indices, textures_info = vertex_info.get_vertices_info(model_path)
 
 scr_width, scr_height = 800, 600
 
 cameraPos = glm.vec3(256, 256, 512)
 deltaTime = 0
 lastTime = 0
+
+vertices = np.array([
+        -0.5, -0.5, -0.5,
+         0.5, -0.5, -0.5,
+         0.5,  0.5, -0.5,
+         0.5,  0.5, -0.5,
+        -0.5,  0.5, -0.5,
+        -0.5, -0.5, -0.5,
+
+        -0.5, -0.5,  0.5,
+         0.5, -0.5,  0.5,
+         0.5,  0.5,  0.5,
+         0.5,  0.5,  0.5,
+        -0.5,  0.5,  0.5,
+        -0.5, -0.5,  0.5,
+
+        -0.5,  0.5,  0.5,
+        -0.5,  0.5, -0.5,
+        -0.5, -0.5, -0.5,
+        -0.5, -0.5, -0.5,
+        -0.5, -0.5,  0.5,
+        -0.5,  0.5,  0.5,
+
+         0.5,  0.5,  0.5,
+         0.5,  0.5, -0.5,
+         0.5, -0.5, -0.5,
+         0.5, -0.5, -0.5,
+         0.5, -0.5,  0.5,
+         0.5,  0.5,  0.5,
+
+        -0.5, -0.5, -0.5,
+         0.5, -0.5, -0.5,
+         0.5, -0.5,  0.5,
+         0.5, -0.5,  0.5,
+        -0.5, -0.5,  0.5,
+        -0.5, -0.5, -0.5,
+
+        -0.5,  0.5, -0.5,
+         0.5,  0.5, -0.5,
+         0.5,  0.5,  0.5,
+         0.5,  0.5,  0.5,
+        -0.5,  0.5,  0.5,
+        -0.5,  0.5, -0.5
+    ], dtype=np.float32)
 
 
 def main():
@@ -45,7 +89,7 @@ def main():
     glEnable(GL_DEPTH_TEST)
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 
-    lightingShader = Shader('./glsl/light.vs', './glsl/light.fs')
+    lightingShader = Shader('./glsl/light_casters.vs', './glsl/light_casters.fs')
     lightCubeShader = Shader('./glsl/normal_light_cube.vs', './glsl/normal_light_cube.fs')
 
     VBO = glGenBuffers(1)
@@ -58,13 +102,17 @@ def main():
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, cube_indices.itemsize * len(cube_indices), cube_indices, GL_STATIC_DRAW)
 
     glBindVertexArray(cubeVAO)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubes.itemsize*6, ctypes.c_void_p(0))
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubes.itemsize*5, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, cubes.itemsize*5, ctypes.c_void_p(cubes.itemsize*3))
+    glEnableVertexAttribArray(1)
 
+    _VBO = glGenBuffers(1)
     lightCubeVAO = glGenVertexArrays(1)
     glBindVertexArray(lightCubeVAO)
-    glBindBuffer(GL_ARRAY_BUFFER, VBO)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, ctypes.c_void_p(0))
+    glBindBuffer(GL_ARRAY_BUFFER, _VBO)
+    glBufferData(GL_ARRAY_BUFFER, vertices.itemsize * len(cubes), vertices, GL_STATIC_DRAW)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertices.itemsize*3, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
 
     diffuseMap = loadTexture("res/textures/container2.png")
@@ -74,10 +122,6 @@ def main():
     lightingShader.set_int("material.diffuse", 0)
     lightingShader.set_int("material.specular", 1)
 
-    model = glm.mat4(1.0)
-    projection = glm.perspective(glm.radians(45), float(scr_width) / float(scr_height), 0.1, 512)
-    lightingShader.setMat4("projection", projection)
-    lightingShader.setMat4("model", model)
 
 
     while not glfw.window_should_close(window):
@@ -96,6 +140,12 @@ def main():
         lightingShader.set_vec3("light.diffuse", 0.5, 0.5, 0.5)
         lightingShader.set_vec3("light.specular", 1.0, 1.0, 1.0)
         lightingShader.set_float("material.shininess", 32.0)
+
+        model = glm.mat4(1.0)
+        projection = glm.perspective(glm.radians(45), float(scr_width) / float(scr_height), 0.1, 512)
+        lightingShader.set_mat4("projection", projection)
+        lightingShader.set_mat4("model", model)
+        lightingShader.set_mat4("t", model)
 
 
 
@@ -120,6 +170,7 @@ def main():
         glfw.poll_events()
     glDeleteVertexArrays(cubeVAO)
     glDeleteVertexArrays(lightCubeVAO)
+    glDeleteBuffers(_VBO)
     glDeleteBuffers(EBO)
     glDeleteBuffers(VBO)
     glfw.terminate()
