@@ -1,6 +1,6 @@
 #version 330 core
-in layout (location = 0) vec3 aPos;
-in layout (location = 1) vec3 aNormal;
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
 
 out vec3 FragPos;
 out vec3 Normal;

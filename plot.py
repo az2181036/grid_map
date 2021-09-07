@@ -1,179 +1,194 @@
-import pygame
-from pygame.locals import *
+import ctypes
 
+import OpenGL.GL.shaders
+import numpy as np
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from OpenGL.GLUT import *
 
-import random
+from PIL import Image
 
-vertices = (
-    (1, -1, -1),
-    (1, 1, -1),
-    (-1, 1, -1),
-    (-1, -1, -1),
-    (1, -1, 1),
-    (1, 1, 1),
-    (-1, -1, 1),
-    (-1, 1, 1)
-)
-
-edges = (
-    (0, 1),
-    (0, 3),
-    (0, 4),
-    (2, 1),
-    (2, 3),
-    (2, 7),
-    (6, 3),
-    (6, 4),
-    (6, 7),
-    (5, 1),
-    (5, 4),
-    (5, 7)
-)
-
-surfaces = (
-    (0, 1, 2, 3),
-    (3, 2, 7, 6),
-    (6, 7, 5, 4),
-    (4, 5, 1, 0),
-    (1, 5, 7, 2),
-    (4, 0, 3, 6)
-)
-
-colors = (
-    (1, 0, 0),
-    (0, 1, 0),
-    (0, 0, 1),
-    (0, 1, 0),
-    (1, 1, 1),
-    (0, 1, 1),
-    (1, 0, 0),
-    (0, 1, 0),
-    (0, 0, 1),
-    (1, 0, 0),
-    (1, 1, 1),
-    (0, 1, 1),
-)
+import glfw
+import glm
+from shader.shader import Shader
+import math
 
 
-def set_vertices(max_distance):
-    x_value_change = random.randrange(-10, 10)
-    y_value_change = random.randrange(-10, 10)
-    z_value_change = random.randrange(-1 * max_distance, -20)
+from utils import vertex_info, util
 
-    new_vertices = []
+model_path = './map/NewWorld1.obj_512.binvox'
+# cubes = vertex_info.get_vertices_info(model_path)
 
-    for vert in vertices:
-        new_vert = []
+scr_width, scr_height = 800, 600
 
-        new_x = vert[0] + x_value_change
-        new_y = vert[1] + y_value_change
-        new_z = vert[2] + z_value_change
+cameraPos = glm.vec3(0, 0, 3)
+lightPos = glm.vec3(1.2, 1.0, 2.0)
+deltaTime = 0
+lastTime = 0
 
-        new_vert.append(new_x)
-        new_vert.append(new_y)
-        new_vert.append(new_z)
-        print(new_x, new_y, new_z)
-        new_vertices.append(new_vert)
+vertices = np.array([
+    -0.5, -0.5, -0.5, 0.0, 0.0, -1.0,
+    0.5, -0.5, -0.5, 0.0, 0.0, -1.0,
+    0.5, 0.5, -0.5, 0.0, 0.0, -1.0,
+    0.5, 0.5, -0.5, 0.0, 0.0, -1.0,
+    -0.5, 0.5, -0.5, 0.0, 0.0, -1.0,
+    -0.5, -0.5, -0.5, 0.0, 0.0, -1.0,
 
-    return new_vertices
+    -0.5, -0.5, 0.5, 0.0, 0.0, 1.0,
+    0.5, -0.5, 0.5, 0.0, 0.0, 1.0,
+    0.5, 0.5, 0.5, 0.0, 0.0, 1.0,
+    0.5, 0.5, 0.5, 0.0, 0.0, 1.0,
+    -0.5, 0.5, 0.5, 0.0, 0.0, 1.0,
+    -0.5, -0.5, 0.5, 0.0, 0.0, 1.0,
 
+    -0.5, 0.5, 0.5, -1.0, 0.0, 0.0,
+    -0.5, 0.5, -0.5, -1.0, 0.0, 0.0,
+    -0.5, -0.5, -0.5, -1.0, 0.0, 0.0,
+    -0.5, -0.5, -0.5, -1.0, 0.0, 0.0,
+    -0.5, -0.5, 0.5, -1.0, 0.0, 0.0,
+    -0.5, 0.5, 0.5, -1.0, 0.0, 0.0,
 
-def Cube(vertices):
-    glBegin(GL_QUADS)
+    0.5, 0.5, 0.5, 1.0, 0.0, 0.0,
+    0.5, 0.5, -0.5, 1.0, 0.0, 0.0,
+    0.5, -0.5, -0.5, 1.0, 0.0, 0.0,
+    0.5, -0.5, -0.5, 1.0, 0.0, 0.0,
+    0.5, -0.5, 0.5, 1.0, 0.0, 0.0,
+    0.5, 0.5, 0.5, 1.0, 0.0, 0.0,
 
-    for surface in surfaces:
-        x = 0
+    -0.5, -0.5, -0.5, 0.0, -1.0, 0.0,
+    0.5, -0.5, -0.5, 0.0, -1.0, 0.0,
+    0.5, -0.5, 0.5, 0.0, -1.0, 0.0,
+    0.5, -0.5, 0.5, 0.0, -1.0, 0.0,
+    -0.5, -0.5, 0.5, 0.0, -1.0, 0.0,
+    -0.5, -0.5, -0.5, 0.0, -1.0, 0.0,
 
-        for vertex in surface:
-            x += 1
-            glColor3fv(colors[x])
-            glVertex3fv(vertices[vertex])
-
-    glEnd()
-
-    glBegin(GL_LINES)
-    for edge in edges:
-        for vertex in edge:
-            glVertex3fv(vertices[vertex])
-    glEnd()
+    -0.5, 0.5, -0.5, 0.0, 1.0, 0.0,
+    0.5, 0.5, -0.5, 0.0, 1.0, 0.0,
+    0.5, 0.5, 0.5, 0.0, 1.0, 0.0,
+    0.5, 0.5, 0.5, 0.0, 1.0, 0.0,
+    -0.5, 0.5, 0.5, 0.0, 1.0, 0.0,
+    -0.5, 0.5, -0.5, 0.0, 1.0, 0.0
+    ], dtype=np.float32)
 
 
 def main():
-    pygame.init()
-    display = (800, 600)
-    pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+    global deltaTime, lastTime, cameraPos
+    if not glfw.init():
+        raise Exception("GLFW can not be initialized.")
+    window = glfw.create_window(scr_width, scr_height, "Model with Light", None, None)
 
-    gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
+    if not window:
+        glfw.terminate()
+        raise Exception("Failed to create GLFW window.")
+    glfw.make_context_current(window)
+    glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
+    glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
+    glfw.set_scroll_callback(window, scroll_callback)
 
-    glTranslatef(random.randrange(-5, 5), random.randrange(-5, 5), -40)
+    glEnable(GL_DEPTH_TEST)
+    # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 
-    # object_passed = False
+    lightingShader = Shader('./glsl/light.vs', './glsl/light.fs')
+    # lightCubeShader = Shader('./glsl/normal_light_cube.vs', './glsl/normal_light_cube.fs')
 
-    x_move = 0
-    y_move = 0
+    VBO = glGenBuffers(1)
+    cubeVAO = glGenVertexArrays(1)
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)
+    glBufferData(GL_ARRAY_BUFFER, vertices.itemsize * len(vertices), vertices, GL_STATIC_DRAW)
+    glBindVertexArray(cubeVAO)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertices.itemsize * 6, ctypes.c_void_p(0))
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertices.itemsize * 6, ctypes.c_void_p(vertices.itemsize * 3))
+    glEnableVertexAttribArray(1)
 
-    max_distance = 100
+    lightCubeVAO = glGenVertexArrays(1)
+    glBindVertexArray(lightCubeVAO)
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertices.itemsize*6, ctypes.c_void_p(0))
+    glEnableVertexAttribArray(0)
 
-    cube_dict = {}
+    while not glfw.window_should_close(window):
+        currentTime = glfw.get_time()
+        deltaTime = currentTime - lastTime
+        lastTime = currentTime
 
-    for x in range(20):
-        cube_dict[x] = set_vertices(max_distance)
+        cameraPos = util.processInput(window, deltaTime, cameraPos)
+        print(cameraPos)
 
-    # glRotatef(25, 2, 1, 0)
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    x_move = 0.3
-                if event.key == pygame.K_RIGHT:
-                    x_move = -0.3
-
-                if event.key == pygame.K_UP:
-                    y_move = -0.3
-                if event.key == pygame.K_DOWN:
-                    y_move = 0.3
-
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
-                    x_move = 0
-
-                if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
-                    y_move = 0
-
-        ##            if event.type == pygame.MOUSEBUTTONDOWN:
-        ##                if event.button == 4:
-        ##                    glTranslatef(0,0,1.0)
-        ##
-        ##                if event.button == 5:
-        ##                    glTranslatef(0,0,-1.0)
-
-        # glRotatef(1, 3, 1, 1)
-
-        x = glGetDoublev(GL_MODELVIEW_MATRIX)
-        # print(x)
-
-        camera_x = x[3][0]
-        camera_y = x[3][1]
-        camera_z = x[3][2]
-
+        glClearColor(1, 1, 1, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        glTranslatef(x_move, y_move, .50)
+        lightingShader.use()
+        lightingShader.set_vec3("objectColor", value=glm.vec3(1.0, 0.5, 0.31))
+        lightingShader.set_vec3("lightColor", value=glm.vec3(1.0, 1.0, 1.0))
+        lightingShader.set_vec3("lightPos", value=lightPos)
+        lightingShader.set_vec3("viewPos", value=cameraPos)
 
-        for each_cube in cube_dict:
-            Cube(cube_dict[each_cube])
+        projection = glm.perspective(glm.radians(45), float(scr_width) / float(scr_height), 0.1, 100)
+        view = glm.lookAt(cameraPos, glm.vec3(0, 0, 0), glm.vec3(0, 1, 0))
 
-        pygame.display.flip()
-        pygame.time.wait(10)
+        lightingShader.set_mat4("projection", projection)
+        lightingShader.set_mat4("view", view)
+
+        model = glm.mat4(1.0)
+        lightingShader.set_mat4("model", model)
+
+        glBindVertexArray(cubeVAO)
+        glDrawArrays(GL_TRIANGLES, 0, 36)
+
+        lightCubeShader.use()
+        lightCubeShader.set_mat4("projection", projection)
+        lightCubeShader.set_mat4("view", view)
+        model = glm.mat4(1.0)
+        # model = glm.translate(model, lightPos)
+        # model = glm.scale(model, glm.vec3(0.2))
+        lightCubeShader.set_mat4("model", model)
+
+        glBindVertexArray(lightCubeVAO)
+        glDrawArrays(GL_TRIANGLES, 0, 36)
+
+        glfw.swap_buffers(window)
+        glfw.poll_events()
+    glDeleteVertexArrays(cubeVAO)
+    #glDeleteVertexArrays(lightCubeVAO)
+    # glDeleteBuffers(_VBO)
+    glDeleteBuffers(VBO)
+    glfw.terminate()
 
 
-main()
-pygame.quit()
-quit()
+def scroll_callback(window, xoffset, yoffset):
+    global cameraPos
+    cameraPos += glm.vec3(0, 0, yoffset)
+
+
+def framebuffer_size_callback(window, width, height):
+    GL_VIEWPORT(0, 0, width, height)
+
+
+def loadTexture(filepath):
+    with Image.open(filepath) as im:
+        textureID = glGenTextures(1)
+        width, height = im.size
+        mode = im.mode
+        data = im.tobytes("raw", mode, 0, -1)
+
+        if mode == "RGBA":
+            mode = GL_RGBA
+        elif mode == "RGB":
+            mode = GL_RGB
+        elif mode == "RED":
+            mode = GL_RED
+
+        glBindTexture(GL_TEXTURE_2D, textureID)
+        glTexImage2D(GL_TEXTURE_2D, 0, mode, width, height, 0, mode, GL_UNSIGNED_BYTE, data)
+        glGenerateMipmap(GL_TEXTURE_2D)
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    return textureID
+
+
+if __name__ == '__main__':
+    main()

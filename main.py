@@ -1,171 +1,213 @@
-import glfw
-from OpenGL.GL import *
+import ctypes
+
 import OpenGL.GL.shaders
-import numpy
-import pyrr
+import numpy as np
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
 from PIL import Image
 
-def window_resize(window, width, height):
-    glViewport(0, 0, width, height)
+import glfw
+import glm
+from shader.shader import Shader
+import math
+
+
+from utils import vertex_info, util
+
+model_path = './map/NewWorld1.obj_512.binvox'
+# cubes = vertex_info.get_vertices_info(model_path)
+
+scr_width, scr_height = 800, 600
+
+cameraPos = glm.vec3(0, 0, 3)
+deltaTime = 0
+lastTime = 0
+
+vertices = np.array([
+    -0.5, -0.5, -0.5, 0.0, 0.0, -1.0, 0.0, 0.0,
+    0.5, -0.5, -0.5, 0.0, 0.0, -1.0, 1.0, 0.0,
+    0.5, 0.5, -0.5, 0.0, 0.0, -1.0, 1.0, 1.0,
+    0.5, 0.5, -0.5, 0.0, 0.0, -1.0, 1.0, 1.0,
+    -0.5, 0.5, -0.5, 0.0, 0.0, -1.0, 0.0, 1.0,
+    -0.5, -0.5, -0.5, 0.0, 0.0, -1.0, 0.0, 0.0,
+
+    -0.5, -0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0,
+    0.5, -0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 0.0,
+    0.5, 0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
+    0.5, 0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
+    -0.5, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 1.0,
+    -0.5, -0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0,
+
+    -0.5, 0.5, 0.5, -1.0, 0.0, 0.0, 1.0, 0.0,
+    -0.5, 0.5, -0.5, -1.0, 0.0, 0.0, 1.0, 1.0,
+    -0.5, -0.5, -0.5, -1.0, 0.0, 0.0, 0.0, 1.0,
+    -0.5, -0.5, -0.5, -1.0, 0.0, 0.0, 0.0, 1.0,
+    -0.5, -0.5, 0.5, -1.0, 0.0, 0.0, 0.0, 0.0,
+    -0.5, 0.5, 0.5, -1.0, 0.0, 0.0, 1.0, 0.0,
+
+    0.5, 0.5, 0.5, 1.0, 0.0, 0.0, 1.0, 0.0,
+    0.5, 0.5, -0.5, 1.0, 0.0, 0.0, 1.0, 1.0,
+    0.5, -0.5, -0.5, 1.0, 0.0, 0.0, 0.0, 1.0,
+    0.5, -0.5, -0.5, 1.0, 0.0, 0.0, 0.0, 1.0,
+    0.5, -0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
+    0.5, 0.5, 0.5, 1.0, 0.0, 0.0, 1.0, 0.0,
+
+    -0.5, -0.5, -0.5, 0.0, -1.0, 0.0, 0.0, 1.0,
+    0.5, -0.5, -0.5, 0.0, -1.0, 0.0, 1.0, 1.0,
+    0.5, -0.5, 0.5, 0.0, -1.0, 0.0, 1.0, 0.0,
+    0.5, -0.5, 0.5, 0.0, -1.0, 0.0, 1.0, 0.0,
+    -0.5, -0.5, 0.5, 0.0, -1.0, 0.0, 0.0, 0.0,
+    -0.5, -0.5, -0.5, 0.0, -1.0, 0.0, 0.0, 1.0,
+
+    -0.5, 0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 1.0,
+    0.5, 0.5, -0.5, 0.0, 1.0, 0.0, 1.0, 1.0,
+    0.5, 0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
+    0.5, 0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
+    -0.5, 0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0,
+    -0.5, 0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 1.0
+    ], dtype=np.float32)
+
 
 def main():
-
-    # initialize glfw
+    global deltaTime, lastTime, cameraPos
     if not glfw.init():
-        return
+        raise Exception("GLFW can not be initialized.")
 
-    w_width, w_height = 800, 600
-
-    #glfw.window_hint(glfw.RESIZABLE, GL_FALSE)
-
-    window = glfw.create_window(w_width, w_height, "My OpenGL window", None, None)
+    window = glfw.create_window(scr_width, scr_height, "Model with Light", None, None)
 
     if not window:
         glfw.terminate()
-        return
-
+        raise Exception("Failed to create GLFW window.")
     glfw.make_context_current(window)
-    glfw.set_window_size_callback(window, window_resize)
+    glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
+    glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_DISABLED)
+    glfw.set_scroll_callback(window, scroll_callback)
 
-    #        positions         colors          texture coords
-    cube = [-0.5, -0.5,  0.5,  1.0, 0.0, 0.0,  0.0, 0.0,
-             0.5, -0.5,  0.5,  0.0, 1.0, 0.0,  1.0, 0.0,
-             0.5,  0.5,  0.5,  0.0, 0.0, 1.0,  1.0, 1.0,
-            -0.5,  0.5,  0.5,  1.0, 1.0, 1.0,  0.0, 1.0,
+    glEnable(GL_DEPTH_TEST)
+    # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 
-            -0.5, -0.5, -0.5,  1.0, 0.0, 0.0,  0.0, 0.0,
-             0.5, -0.5, -0.5,  0.0, 1.0, 0.0,  1.0, 0.0,
-             0.5,  0.5, -0.5,  0.0, 0.0, 1.0,  1.0, 1.0,
-            -0.5,  0.5, -0.5,  1.0, 1.0, 1.0,  0.0, 1.0,
-
-             0.5, -0.5, -0.5,  1.0, 0.0, 0.0,  0.0, 0.0,
-             0.5,  0.5, -0.5,  0.0, 1.0, 0.0,  1.0, 0.0,
-             0.5,  0.5,  0.5,  0.0, 0.0, 1.0,  1.0, 1.0,
-             0.5, -0.5,  0.5,  1.0, 1.0, 1.0,  0.0, 1.0,
-
-            -0.5,  0.5, -0.5,  1.0, 0.0, 0.0,  0.0, 0.0,
-            -0.5, -0.5, -0.5,  0.0, 1.0, 0.0,  1.0, 0.0,
-            -0.5, -0.5,  0.5,  0.0, 0.0, 1.0,  1.0, 1.0,
-            -0.5,  0.5,  0.5,  1.0, 1.0, 1.0,  0.0, 1.0,
-
-            -0.5, -0.5, -0.5,  1.0, 0.0, 0.0,  0.0, 0.0,
-             0.5, -0.5, -0.5,  0.0, 1.0, 0.0,  1.0, 0.0,
-             0.5, -0.5,  0.5,  0.0, 0.0, 1.0,  1.0, 1.0,
-            -0.5, -0.5,  0.5,  1.0, 1.0, 1.0,  0.0, 1.0,
-
-             0.5,  0.5, -0.5,  1.0, 0.0, 0.0,  0.0, 0.0,
-            -0.5,  0.5, -0.5,  0.0, 1.0, 0.0,  1.0, 0.0,
-            -0.5,  0.5,  0.5,  0.0, 0.0, 1.0,  1.0, 1.0,
-             0.5,  0.5,  0.5,  1.0, 1.0, 1.0,  0.0, 1.0]
-
-    cube = numpy.array(cube, dtype = numpy.float32)
-
-    indices = [ 0,  1,  2,  2,  3,  0,
-                4,  5,  6,  6,  7,  4,
-                8,  9, 10, 10, 11,  8,
-               12, 13, 14, 14, 15, 12,
-               16, 17, 18, 18, 19, 16,
-               20, 21, 22, 22, 23, 20]
-
-    indices = numpy.array(indices, dtype= numpy.uint32)
-
-    vertex_shader = """
-    #version 330
-    in layout(location = 0) vec3 position;
-    in layout(location = 1) vec3 color;
-    in layout(location = 2) vec2 textureCoords;
-    uniform mat4 view;
-    uniform mat4 model;
-    uniform mat4 projection;
-    out vec3 newColor;
-    out vec2 newTexture;
-    void main()
-    {
-        gl_Position = projection * view * model * vec4(position, 1.0f);
-        newColor = color;
-        newTexture = textureCoords;
-    }
-    """
-
-    fragment_shader = """
-    #version 330
-    in vec3 newColor;
-    in vec2 newTexture;
-    out vec4 outColor;
-    uniform sampler2D samplerTexture;
-    void main()
-    {
-        outColor = texture(samplerTexture, newTexture); //* vec4(newColor, 1.0f);
-    }
-    """
-    shader = OpenGL.GL.shaders.compileProgram(OpenGL.GL.shaders.compileShader(vertex_shader, GL_VERTEX_SHADER),
-                                              OpenGL.GL.shaders.compileShader(fragment_shader, GL_FRAGMENT_SHADER))
+    lightingShader = Shader('./glsl/materials.vs', './glsl/materials.fs')
+    lightCubeShader = Shader('./glsl/normal_light_cube.vs', './glsl/normal_light_cube.fs')
 
     VBO = glGenBuffers(1)
+    cubeVAO = glGenVertexArrays(1)
+
     glBindBuffer(GL_ARRAY_BUFFER, VBO)
-    glBufferData(GL_ARRAY_BUFFER, cube.itemsize * len(cube), cube, GL_STATIC_DRAW)
-
-    EBO = glGenBuffers(1)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.itemsize * len(indices), indices, GL_STATIC_DRAW)
-
-    #position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cube.itemsize * 8, ctypes.c_void_p(0))
+    glBufferData(GL_ARRAY_BUFFER, vertices.itemsize * len(vertices), vertices, GL_STATIC_DRAW)
+    glBindVertexArray(cubeVAO)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertices.itemsize * 6, ctypes.c_void_p(0))
     glEnableVertexAttribArray(0)
-    #color
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, cube.itemsize * 8, ctypes.c_void_p(12))
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertices.itemsize * 6, ctypes.c_void_p(vertices.itemsize * 3))
     glEnableVertexAttribArray(1)
-    #texture
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, cube.itemsize * 8, ctypes.c_void_p(24))
-    glEnableVertexAttribArray(2)
 
-
-    texture = glGenTextures(1)
-    glBindTexture(GL_TEXTURE_2D, texture)
-    # Set the texture wrapping parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-    # Set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    # load image
-    image = Image.open("res/222.jpg")
-    img_data = numpy.array(list(image.getdata()), numpy.uint8)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data)
-    glEnable(GL_TEXTURE_2D)
-
-
-    glUseProgram(shader)
-
-    glClearColor(0.2, 0.3, 0.2, 1.0)
-    glEnable(GL_DEPTH_TEST)
-    #glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-
-    view = pyrr.matrix44.create_from_translation(pyrr.Vector3([0.0, 0.0, -3.0]))
-    projection = pyrr.matrix44.create_perspective_projection_matrix(45.0, w_width / w_height, 0.1, 100.0)
-    # model = pyrr.matrix44.create_from_translation(-55, pyrr.Vector3([0.0, 0.0, 0.0]))
-    model = pyrr.matrix44.create_from_axis_rotation(pyrr.Vector3([1.0, 1.0, 0.0]), -55.0)
-
-    view_loc = glGetUniformLocation(shader, "view")
-    proj_loc = glGetUniformLocation(shader, "projection")
-    model_loc = glGetUniformLocation(shader, "model")
-
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view)
-    glUniformMatrix4fv(proj_loc, 1, GL_FALSE, projection)
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, model)
-
-
+    # _VBO = glGenBuffers(1)
+    lightCubeVAO = glGenVertexArrays(1)
+    glBindVertexArray(lightCubeVAO)
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)
+    # glBufferData(GL_ARRAY_BUFFER, vertices.itemsize * len(cubes), vertices, GL_STATIC_DRAW)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertices.itemsize*6, ctypes.c_void_p(0))
+    glEnableVertexAttribArray(0)
 
     while not glfw.window_should_close(window):
-        glfw.poll_events()
 
+        currentTime = glfw.get_time()
+        deltaTime = currentTime - lastTime
+        lastTime = currentTime
+
+        glClearColor(0.1, 0.1, 0.1, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        glDrawElements(GL_TRIANGLES, len(indices), GL_UNSIGNED_INT, None)
+        cameraPos = util.processInput(window, deltaTime, cameraPos)
+        print(cameraPos)
+
+
+        lightingShader.use()
+        lightingShader.set_vec3("light.position", glm.vec3(1.2, 1.0, 2.0))
+        lightingShader.set_vec3("viewPos", cameraPos)
+
+        lightColor = glm.vec3()
+        lightColor.x = math.sin(glfw.get_time() * 2.0)
+        lightColor.y = math.sin(glfw.get_time() * 0.7)
+        lightColor.z = math.sin(glfw.get_time() * 1.3)
+        diffuseColor = lightColor * glm.vec3(0.5)
+        ambientColor = diffuseColor * glm.vec3(0.2)
+        lightingShader.set_vec3("light.ambient", value=ambientColor)
+        lightingShader.set_vec3("light.diffuse", value=diffuseColor)
+        lightingShader.set_vec3("light.specular", value=glm.vec3(1.0, 1.0, 1.0))
+
+        lightingShader.set_vec3("material.ambient", value=glm.vec3(1.0, 0.5, 0.31))
+        print(cameraPos)
+        lightingShader.set_vec3("material.diffuse", value=glm.vec3(1.0, 0.5, 0.31))
+        print(cameraPos)
+        lightingShader.set_vec3("material.specular", value=glm.vec3(0.5, 0.5, 0.5))
+        lightingShader.set_float("material.shininess", 32.0)
+
+        model = glm.mat4(1.0)
+        projection = glm.perspective(glm.radians(45), float(scr_width) / float(scr_height), 0.1, 100)
+        view = glm.lookAt(cameraPos, glm.vec3(0, 0, 0), glm.vec3(0, 1, 0))
+
+        lightingShader.set_mat4("model", model)
+        lightingShader.set_mat4("projection", projection)
+        lightingShader.set_mat4("view", view)
+
+        glBindVertexArray(cubeVAO)
+        glDrawArrays(GL_TRIANGLES, 0, int(len(vertices)/8))
+
+        lightCubeShader.use()
+        lightCubeShader.set_mat4("projection", projection)
+        lightCubeShader.set_mat4("view", view)
+        model = glm.mat4(1.0)
+        model = glm.translate(model, [1.2, 1.0, 2.0])
+        model = glm.scale(model, glm.vec3(0.2))
+        lightCubeShader.set_mat4("model", model)
+
+        glBindVertexArray(lightCubeVAO)
+        glDrawArrays(GL_TRIANGLES, 0, 36)
 
         glfw.swap_buffers(window)
-
+        glfw.poll_events()
+    glDeleteVertexArrays(cubeVAO)
+    glDeleteVertexArrays(lightCubeVAO)
+    # glDeleteBuffers(_VBO)
+    glDeleteBuffers(VBO)
     glfw.terminate()
 
-if __name__ == "__main__":
+
+def scroll_callback(window, xoffset, yoffset):
+    global cameraPos
+    cameraPos += glm.vec3(0, 0, yoffset)
+
+
+def framebuffer_size_callback(window, width, height):
+    GL_VIEWPORT(0, 0, width, height)
+
+
+def loadTexture(filepath):
+    with Image.open(filepath) as im:
+        textureID = glGenTextures(1)
+        width, height = im.size
+        mode = im.mode
+        data = im.tobytes("raw", mode, 0, -1)
+
+        if mode == "RGBA":
+            mode = GL_RGBA
+        elif mode == "RGB":
+            mode = GL_RGB
+        elif mode == "RED":
+            mode = GL_RED
+
+        glBindTexture(GL_TEXTURE_2D, textureID)
+        glTexImage2D(GL_TEXTURE_2D, 0, mode, width, height, 0, mode, GL_UNSIGNED_BYTE, data)
+        glGenerateMipmap(GL_TEXTURE_2D)
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+    return textureID
+
+
+if __name__ == '__main__':
     main()
